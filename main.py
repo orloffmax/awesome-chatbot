@@ -1,5 +1,7 @@
 import os
 from telethon.sync import TelegramClient, events
+from telethon.tl.types import PeerChannel
+
 from captcha_challenge import Captcha
 
 
@@ -10,6 +12,12 @@ API_HASH = os.environ['API_HASH']
 bot = TelegramClient('bot', API_ID, API_HASH).start(bot_token=API_TOKEN)
 
 wait_captcha = {}
+
+bad_words = [
+    "какашка",
+    "говняшка",
+    "дурачок"
+]
 
 
 @bot.on(events.ChatAction)
@@ -36,23 +44,34 @@ async def chat_action(event):
 
 @bot.on(events.NewMessage)
 async def new_message(event):
-    peer_user = event.from_id
-    peer_channel = event.peer_id
+    if isinstance(event.peer_id, PeerChannel):
+        peer_user = event.from_id
+        peer_channel = event.peer_id
 
-    user_entity = await bot.get_entity(peer_user)
+        user_entity = await bot.get_entity(peer_user)
 
-    captcha = wait_captcha.get((peer_user.user_id, peer_channel.channel_id))
+        captcha = wait_captcha.get((peer_user.user_id, peer_channel.channel_id))
 
-    if captcha is not None:
-        if event.text != captcha:
-            await event.respond('Капча введена неверно.')
-            await bot.delete_messages(peer_channel, event.message)
-            await bot.kick_participant(peer_channel, peer_user)
-        else:
-            await event.respond(f'Добро пожаловать, {user_entity.first_name}!')
-            await bot.delete_messages(peer_channel, [event.message.id, event.message.id - 1])
-            del wait_captcha[(peer_user.user_id, peer_channel.channel_id)]
-            return
+        if captcha is not None:
+            if event.text != captcha:
+                await event.respond('Капча введена неверно.')
+                await bot.delete_messages(peer_channel, event.message)
+                await bot.kick_participant(peer_channel, peer_user)
+            else:
+                await event.respond(f'Добро пожаловать, {user_entity.first_name}!')
+                await bot.delete_messages(peer_channel, [event.message.id, event.message.id - 1])
+                del wait_captcha[(peer_user.user_id, peer_channel.channel_id)]
+                return
+
+        if any(bad_word in event.text for bad_word in bad_words):
+            await bot.delete_messages(
+                entity=peer_channel,
+                message_ids=[event.message]
+            )
+            await bot.send_message(
+                entity=peer_channel,
+                message=f"{user_entity.first_name}, не ругайся!"
+            )
 
 
 def main():
