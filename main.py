@@ -1,4 +1,6 @@
 import os
+from datetime import timedelta
+
 from telethon.sync import TelegramClient, events
 from telethon.tl.types import PeerChannel
 
@@ -18,6 +20,8 @@ bad_words = [
     "говняшка",
     "дурачок"
 ]
+
+bad_guys = {}
 
 
 @bot.on(events.ChatAction)
@@ -63,15 +67,44 @@ async def new_message(event):
                 del wait_captcha[(peer_user.user_id, peer_channel.channel_id)]
                 return
 
-        if any(bad_word in event.text for bad_word in bad_words):
+        if any(bad_word in event.text.lower() for bad_word in bad_words):
+            if not bad_guys.get((peer_user.user_id, peer_channel.channel_id)):
+                bad_guys[(peer_user.user_id, peer_channel.channel_id)] = 1
+            else:
+                bad_guys[(peer_user.user_id, peer_channel.channel_id)] += 1
+
             await bot.delete_messages(
                 entity=peer_channel,
                 message_ids=[event.message]
             )
-            await bot.send_message(
-                entity=peer_channel,
-                message=f"{user_entity.first_name}, не ругайся!"
-            )
+
+            match bad_guys[(peer_user.user_id, peer_channel.channel_id)]:
+                case 1:
+                    await bot.send_message(
+                        entity=peer_channel,
+                        message=f"{user_entity.first_name}, не ругайся! Иначе ограничу доступ к сообщениям."
+                    )
+                case 2:
+                    await bot.edit_permissions(
+                        entity=peer_channel,
+                        user=peer_user,
+                        send_messages=False,
+                        until_date=timedelta(minutes=1)
+                    )
+                    await bot.send_message(
+                        entity=peer_channel,
+                        message=f"{user_entity.first_name} получил ограничение на отправку сообщений на 1 минуту."
+                    )
+                case 3:
+                    await bot.kick_participant(
+                        entity=peer_channel,
+                        user=peer_user
+                    )
+                    await bot.send_message(
+                        entity=peer_channel,
+                        message=f"{user_entity.first_name} был исключен за неоднократные нарушения правил чата."
+                    )
+                    del bad_guys[(peer_user.user_id, peer_channel.channel_id)]
 
 
 def main():
