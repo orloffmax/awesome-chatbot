@@ -2,7 +2,16 @@ import os
 from datetime import timedelta
 
 from telethon.sync import TelegramClient, events
-from telethon.tl.types import PeerChannel
+from telethon.tl.types import (
+    PeerChannel,
+    PeerUser,
+    ReplyKeyboardMarkup,
+    ReplyInlineMarkup,
+    KeyboardButtonRow,
+    KeyboardButton,
+    KeyboardButtonUrl,
+    KeyboardButtonCallback
+)
 
 from captcha_challenge import Captcha
 
@@ -22,6 +31,58 @@ bad_words = [
 ]
 
 bad_guys = {}
+
+
+@bot.on(events.NewMessage(pattern='/start'))
+async def start(event):
+    if isinstance(event.peer_id, PeerUser):
+        keyboard_buttons = ReplyKeyboardMarkup(
+            [
+                KeyboardButtonRow(
+                    [
+                        KeyboardButton(text="Меню")
+                    ]
+                )
+            ]
+        )
+
+        await bot.send_message(
+            entity=event.peer_id,
+            message="Чтобы вызвать меню, нажмите на кнопку 'Меню'",
+            buttons=keyboard_buttons
+        )
+
+
+@bot.on(events.NewMessage(pattern='Меню'))
+async def menu(event):
+    if isinstance(event.peer_id, PeerUser):
+        inline_buttons = ReplyInlineMarkup(
+            [
+                KeyboardButtonRow(
+                    [
+                        KeyboardButtonUrl(
+                            text="Смотреть код на Github",
+                            url="https://github.com/orloffmax/awesome-chatbot"
+                        ),
+                        KeyboardButtonCallback(
+                            text="Сказать спасибо за видео",
+                            data=b'thanks'
+                        )
+                    ]
+                )
+            ]
+        )
+
+        await bot.send_message(
+            entity=event.peer_id,
+            message="Выбери пункт меню:",
+            buttons=inline_buttons
+        )
+
+
+@bot.on(events.CallbackQuery(data=b'thanks'))
+async def thanks(event):
+    await event.respond("Ставь лайк и подписывайся на канал, если нравится :)")
 
 
 @bot.on(events.ChatAction)
