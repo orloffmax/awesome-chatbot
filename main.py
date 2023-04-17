@@ -12,6 +12,7 @@ from telethon.tl.types import (
     KeyboardButtonUrl,
     KeyboardButtonCallback
 )
+import asyncpraw
 
 from captcha_challenge import Captcha
 
@@ -31,6 +32,30 @@ bad_words = [
 ]
 
 bad_guys = {}
+
+reddit = asyncpraw.Reddit(
+    client_id=os.environ["REDDIT_CLIENT_ID"],
+    client_secret=os.environ["REDDIT_CLIENT_SECRET"],
+    user_agent="python:awesome-bot:v1 (by u/orl412)"
+)
+
+
+@bot.on(events.NewMessage(pattern='/reddit'))
+async def reddit_memes(event):
+    subreddit = await reddit.subreddit("memes")
+    async for submission in subreddit.new(limit=10):
+        if submission.url[-4:] in ['.jpg', '.png', '.gif']:
+            if isinstance(event.peer_id, PeerUser):
+                entity = event.peer_id
+            else:
+                entity = event.chat
+
+            await bot.send_message(
+                entity=entity,
+                message=submission.title,
+                file=submission.url
+            )
+            break
 
 
 @bot.on(events.NewMessage(pattern='/start'))
